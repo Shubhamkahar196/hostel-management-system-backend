@@ -3,7 +3,7 @@ const cors = require('cors');
 const db = require('./db');
 const adminRoutes = require('./routes/admin');
 const cookieParser = require("cookie-parser");
-const studentRoutes = require('./routes/studentRoutes');
+const studentRoutes = require('./routes/students');
 
 
 
@@ -29,4 +29,5 @@ app.listen(PORT, () => {
 
 
 app.use('/admin', adminRoutes);
-app.use('/api', studentRoutes);
+app.use('/students', studentRoutes);
+
