@@ -1,11 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
-const adminRoutes = require('./routes/admin');
 const cookieParser = require("cookie-parser");
+
+const adminRoutes = require('./routes/admin');
 const studentRoutes = require('./routes/students');
 const roomRoutes = require('./routes/rooms');
-
+const feeRoutes = require('./routes/fees');
 
 require('dotenv').config();
 
@@ -29,3 +30,4 @@ app.listen(PORT, () => {
 app.use('/admin', adminRoutes);
 app.use('/students', studentRoutes);
 app.use('/rooms', roomRoutes);
+app.use('/fees', feeRoutes);
