@@ -4,42 +4,62 @@ const router = express.Router();
 const db = require('../db');
 const verifyToken = require('../middleware/verifyToken'); // your JWT middleware
 
-// Add a new student
+// Add a new student (UPDATED WITH TRANSACTION LOGIC)
 router.post('/add', verifyToken, async (req, res) => {
+    // Get a connection from the pool to use for the transaction
+    const connection = await db.promise().getConnection();
+
     try {
         const { name, roll_no, email, phone, gender, dob, address, guardian_name, guardian_phone, room_no, department, year } = req.body;
 
-        // Check required fields
-        if (!name || !roll_no || !email || !gender || !dob || !address || !guardian_name || !guardian_phone || !department || !year) {
-            return res.status(400).json({ message: 'All fields are required' });
+        // --- Start of Transaction ---
+        await connection.beginTransaction();
+
+        // Step 1: Check if the room exists and has space
+        const [rooms] = await connection.query('SELECT * FROM rooms WHERE room_number = ?', [room_no]);
+        if (rooms.length === 0) {
+            await connection.rollback(); // Undo everything
+            connection.release();
+            return res.status(404).json({ message: 'Room not found' });
         }
 
-        // Roll number pattern: 3 digits + (cs|ad|me|ec) + 4 digits
-        const rollPattern = /^\d{3}(cs|ad|me|ec)\d{4}$/;
-        if (!rollPattern.test(roll_no)) {
-            return res.status(400).json({ message: 'Invalid roll number format' });
+        const room = rooms[0];
+        if (room.current_occupancy >= room.capacity) {
+            await connection.rollback(); // Undo everything
+            connection.release();
+            return res.status(409).json({ message: 'Room is already full' });
         }
 
-        // Check if roll_no already exists
-        const [existing] = await db.promise().query('SELECT * FROM students WHERE roll_no = ?', [roll_no]);
-        if (existing.length > 0) {
-            return res.status(409).json({ message: 'Roll number already exists' });
-        }
-
-        // Insert student
-        await db.promise().query(
+        // Step 2: Insert the new student
+        await connection.query(
             `INSERT INTO students (name, roll_no, email, phone, gender, dob, address, guardian_name, guardian_phone, room_no, department, year)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [name, roll_no, email, phone, gender, dob, address, guardian_name, guardian_phone, room_no, department, year]
         );
 
-        res.status(201).json({ message: 'Student added successfully' });
+        // Step 3: Update the room's occupancy
+        await connection.query(
+            'UPDATE rooms SET current_occupancy = current_occupancy + 1 WHERE id = ?',
+            [room.id]
+        );
+
+        // If all steps succeed, commit the transaction
+        await connection.commit();
+        // --- End of Transaction ---
+
+        res.status(201).json({ message: 'Student added and room allocated successfully' });
 
     } catch (err) {
-        console.error('Error adding student:', err);
+        // If any error occurs, roll back the transaction
+        await connection.rollback();
+        console.error('Error adding student with transaction:', err);
         res.status(500).json({ message: 'Server error' });
+    } finally {
+        // ALWAYS release the connection back to the pool
+        if (connection) connection.release();
     }
 });
+
 
 // Get all students
 router.get('/', verifyToken, async (req, res) => {
@@ -52,63 +72,106 @@ router.get('/', verifyToken, async (req, res) => {
     }
 });
 
-// Update a student's details
+// routes/students.js
+
+// ... (your other routes)
+
+// Update a student's details (UPDATED WITH TRANSACTION LOGIC)
 router.put('/update/:id', verifyToken, async (req, res) => {
+    const connection = await db.promise().getConnection();
     try {
         const { id } = req.params;
+        const { room_no: new_room_no, ...studentDetails } = req.body;
 
-        // 1. Fetch the existing student from the database
-        const [existingStudentRows] = await db.promise().query('SELECT * FROM students WHERE id = ?', [id]);
-        if (existingStudentRows.length === 0) {
+        await connection.beginTransaction();
+
+        // 1. Get the student's current (old) room number
+        const [students] = await connection.query('SELECT room_no FROM students WHERE id = ?', [id]);
+        if (students.length === 0) {
+            await connection.rollback();
+            connection.release();
             return res.status(404).json({ message: 'Student not found' });
         }
+        const old_room_no = students[0].room_no;
 
-        // 2. Create an updated student object
-        // It takes the original student's data and overwrites it with any new data from the request body.
-        const updatedStudent = {
-            ...existingStudentRows[0], // The original data
-            ...req.body              // The new data to update
-        };
+        // 2. If the room is being changed, handle occupancy updates
+        if (new_room_no && old_room_no !== new_room_no) {
+            // Check if the new room is available
+            const [new_rooms] = await connection.query('SELECT * FROM rooms WHERE room_number = ?', [new_room_no]);
+            if (new_rooms.length === 0) {
+                await connection.rollback();
+                connection.release();
+                return res.status(404).json({ message: 'New room not found' });
+            }
+            if (new_rooms[0].current_occupancy >= new_rooms[0].capacity) {
+                await connection.rollback();
+                connection.release();
+                return res.status(409).json({ message: 'New room is full' });
+            }
 
-        // Destructure all fields from the final merged object
-        const { name, email, phone, address, guardian_name, guardian_phone, room_no } = updatedStudent;
+            // Decrement old room's occupancy (if they had one)
+            if (old_room_no) {
+                await connection.query('UPDATE rooms SET current_occupancy = current_occupancy - 1 WHERE room_number = ?', [old_room_no]);
+            }
+            // Increment new room's occupancy
+            await connection.query('UPDATE rooms SET current_occupancy = current_occupancy + 1 WHERE room_number = ?', [new_room_no]);
+        }
 
-        // 3. Update the student record in the database using the merged data
-        await db.promise().query(
-            `UPDATE students SET 
-                name = ?, email = ?, phone = ?, address = ?, 
-                guardian_name = ?, guardian_phone = ?, room_no = ? 
-            WHERE id = ?`,
-            [name, email, phone, address, guardian_name, guardian_phone, room_no, id]
-        );
+        // 3. Update the student's details
+        const finalStudentData = { ...studentDetails, room_no: new_room_no };
+        await connection.query('UPDATE students SET ? WHERE id = ?', [finalStudentData, id]);
 
+        await connection.commit();
         res.status(200).json({ message: 'Student details updated successfully' });
 
     } catch (err) {
+        await connection.rollback();
         console.error('Error updating student:', err);
         res.status(500).json({ message: 'Server error' });
+    } finally {
+        if (connection) connection.release();
     }
 });
 
 
-// Delete a student
+// Delete a student (UPDATED WITH TRANSACTION LOGIC)
 router.delete('/delete/:id', verifyToken, async (req, res) => {
+    const connection = await db.promise().getConnection();
     try {
         const { id } = req.params;
 
-        // Check if the student exists before deleting
-        const [student] = await db.promise().query('SELECT * FROM students WHERE id = ?', [id]);
-        if (student.length === 0) {
+        await connection.beginTransaction();
+
+        // 1. Find the student to get their room number before deleting
+        const [students] = await connection.query('SELECT room_no FROM students WHERE id = ?', [id]);
+        if (students.length === 0) {
+            // No student found, but no harm done. We can just end.
+            await connection.rollback();
+            connection.release();
             return res.status(404).json({ message: 'Student not found' });
         }
+        const { room_no } = students[0];
 
-        // Delete the student record
-        await db.promise().query('DELETE FROM students WHERE id = ?', [id]);
+        // 2. Delete the student
+        await connection.query('DELETE FROM students WHERE id = ?', [id]);
 
+        // 3. If they had a room, decrement the room's occupancy
+        if (room_no) {
+            await connection.query(
+                'UPDATE rooms SET current_occupancy = current_occupancy - 1 WHERE room_number = ? AND current_occupancy > 0',
+                [room_no]
+            );
+        }
+
+        await connection.commit();
         res.status(200).json({ message: 'Student deleted successfully' });
+
     } catch (err) {
+        await connection.rollback();
         console.error('Error deleting student:', err);
         res.status(500).json({ message: 'Server error' });
+    } finally {
+        if (connection) connection.release();
     }
 });
 

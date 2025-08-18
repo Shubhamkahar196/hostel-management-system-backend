@@ -4,6 +4,7 @@ const db = require('./db');
 const adminRoutes = require('./routes/admin');
 const cookieParser = require("cookie-parser");
 const studentRoutes = require('./routes/students');
+const roomRoutes = require('./routes/rooms');
 
 
 require('dotenv').config();
@@ -27,4 +28,4 @@ app.listen(PORT, () => {
 
 app.use('/admin', adminRoutes);
 app.use('/students', studentRoutes);
-
+app.use('/rooms', roomRoutes);
