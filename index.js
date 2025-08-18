@@ -6,9 +6,6 @@ const cookieParser = require("cookie-parser");
 const studentRoutes = require('./routes/students');
 
 
-
-
-
 require('dotenv').config();
 
 const app = express();
