@@ -3,38 +3,44 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const verifyToken = require('../middleware/verifyToken'); // your JWT middleware
+const bcrypt = require('bcrypt');
+
 
 // Add a new student (UPDATED WITH TRANSACTION LOGIC)
 router.post('/add', verifyToken, async (req, res) => {
-    // Get a connection from the pool to use for the transaction
     const connection = await db.promise().getConnection();
-
     try {
         const { name, roll_no, email, phone, gender, dob, address, guardian_name, guardian_phone, room_no, department, year } = req.body;
 
         // --- Start of Transaction ---
         await connection.beginTransaction();
 
-        // Step 1: Check if the room exists and has space
+        // Step 1: Hash the initial password (which is the roll_no)
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(roll_no, salt);
+
+        // Room availability checks (as you had before)
         const [rooms] = await connection.query('SELECT * FROM rooms WHERE room_number = ?', [room_no]);
         if (rooms.length === 0) {
-            await connection.rollback(); // Undo everything
+            await connection.rollback();
             connection.release();
             return res.status(404).json({ message: 'Room not found' });
         }
-
         const room = rooms[0];
         if (room.current_occupancy >= room.capacity) {
-            await connection.rollback(); // Undo everything
+            await connection.rollback();
             connection.release();
             return res.status(409).json({ message: 'Room is already full' });
         }
 
-        // Step 2: Insert the new student
+        // Step 2: Insert the new student with the corrected SQL
+        // The placeholders have been replaced with the actual column names and variables
         await connection.query(
-            `INSERT INTO students (name, roll_no, email, phone, gender, dob, address, guardian_name, guardian_phone, room_no, department, year)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [name, roll_no, email, phone, gender, dob, address, guardian_name, guardian_phone, room_no, department, year]
+            `INSERT INTO students 
+                (name, roll_no, email, phone, gender, dob, address, guardian_name, guardian_phone, room_no, department, year, password)
+             VALUES 
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [name, roll_no, email, phone, gender, dob, address, guardian_name, guardian_phone, room_no, department, year, hashedPassword]
         );
 
         // Step 3: Update the room's occupancy
@@ -43,19 +49,16 @@ router.post('/add', verifyToken, async (req, res) => {
             [room.id]
         );
 
-        // If all steps succeed, commit the transaction
         await connection.commit();
         // --- End of Transaction ---
 
-        res.status(201).json({ message: 'Student added and room allocated successfully' });
+        res.status(201).json({ message: 'Student added successfully' });
 
     } catch (err) {
-        // If any error occurs, roll back the transaction
         await connection.rollback();
         console.error('Error adding student with transaction:', err);
         res.status(500).json({ message: 'Server error' });
     } finally {
-        // ALWAYS release the connection back to the pool
         if (connection) connection.release();
     }
 });

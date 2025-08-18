@@ -7,6 +7,8 @@ const adminRoutes = require('./routes/admin');
 const studentRoutes = require('./routes/students');
 const roomRoutes = require('./routes/rooms');
 const feeRoutes = require('./routes/fees');
+const authRoutes = require('./routes/auth');
+const studentPortalRoutes = require('./routes/studentPortal');
 
 require('dotenv').config();
 
@@ -31,3 +33,5 @@ app.use('/admin', adminRoutes);
 app.use('/students', studentRoutes);
 app.use('/rooms', roomRoutes);
 app.use('/fees', feeRoutes);
+app.use('/auth', authRoutes);
+app.use('/student', studentPortalRoutes);
