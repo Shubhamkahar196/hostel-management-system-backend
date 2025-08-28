@@ -34,8 +34,8 @@ Follow these instructions to get a copy of the project up and running on your lo
 
 1.  **Clone the repository:**
     ```sh
-    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
-    cd your-repo-name
+    git clone [https://github.com/Vermadeepakd1/hostel-management-system-backend.git](https://github.com/Vermadeepakd1/hostel-management-system-backend.git)
+    cd hostel-management-system-backend
     ```
 
 2.  **Install NPM packages:**
