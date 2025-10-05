@@ -13,12 +13,13 @@ const complaintRoutes = require('./routes/complaints');
 
 require('dotenv').config();
 
+const allowedOrigins = ['http://localhost:5173']
+
 const app = express();
-app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true
 }));
 
