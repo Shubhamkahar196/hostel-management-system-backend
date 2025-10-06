@@ -30,8 +30,16 @@ router.post('/student/login', async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '2h' }
         );
+        res
+      .cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", // Correct: Dynamic secure flag
+        sameSite: "lax",
+        maxAge: 24 * 60 * 60 * 1000
+      })
+      .status(200).json({ message: 'Login successful' });
 
-        res.cookie("token", token, { httpOnly: true }).status(200).json({ message: 'Login successful' });
+        // res.cookie("token", token, { httpOnly: true }).status(200).json({ message: 'Login successful' });
 
     } catch (err) {
         console.error('Student Login Error:', err);
