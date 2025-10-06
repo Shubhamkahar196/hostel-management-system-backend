@@ -32,15 +32,13 @@ router.post('/login', async (req, res) => {
             { expiresIn: '2h' }
         );
 
-        res
-            .cookie("token", token, {
-                httpOnly: true,
-                secure: false,        // Set to true in production with HTTPS
-                sameSite: "lax",
-                maxAge: 24 * 60 * 60 * 1000
-            })
-            .status(200)
-            .json({
+
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production", // Correct: Dynamic secure flag
+            sameSite: "lax",
+            maxAge: 24 * 60 * 60 * 1000
+            }).status(200).json({
                 message: 'Login successful',
                 admin: {
                     id: admin.id,
@@ -49,6 +47,24 @@ router.post('/login', async (req, res) => {
                     email: admin.email,
                 }
             });
+
+        // res
+        //     .cookie("token", token, {
+        //         httpOnly: true,
+        //         secure: false,        // Set to true in production with HTTPS
+        //         sameSite: "lax",
+        //         maxAge: 24 * 60 * 60 * 1000
+        //     })
+        //     .status(200)
+        //     .json({
+        //         message: 'Login successful',
+        //         admin: {
+        //             id: admin.id,
+        //             name: admin.name,
+        //             username: admin.username,
+        //             email: admin.email,
+        //         }
+        //     });
 
     } catch (err) {
         console.error('Login Error:', err);
