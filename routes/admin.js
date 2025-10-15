@@ -34,11 +34,11 @@ router.post('/login', async (req, res) => {
 
 
         res.cookie("token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production", // Correct: Dynamic secure flag
-            sameSite: "lax",
-            maxAge: 24 * 60 * 60 * 1000
-            }).status(200).json({
+        httpOnly: true,
+        secure: true, 
+        sameSite: "none", 
+        maxAge: 24 * 60 * 60 * 1000
+        }).status(200).json({
                 message: 'Login successful',
                 admin: {
                     id: admin.id,
