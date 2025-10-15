@@ -13,7 +13,7 @@ const complaintRoutes = require('./routes/complaints');
 
 require('dotenv').config();
 
-const allowedOrigins = ['http://localhost:5173', 'https://hostelmanagementsystem-rho.vercel.app']
+const allowedOrigins = ['http://localhost:5173', 'https://hostelmanagementsystem-rho.vercel.app'];
 
 const app = express();
 app.use(express.json());
