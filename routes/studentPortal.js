@@ -85,4 +85,43 @@ router.get('/complaint', verifyToken, async (req, res) => {
     }
 });
 
+// POST: A logged-in student submits a new out pass request
+router.post('/outpass', verifyToken, async (req, res) => {
+    try {
+        const studentId = req.user.id;
+        const { reason, departure_time, expected_return_time } = req.body;
+
+        if (!reason || !departure_time || !expected_return_time) {
+            return res.status(400).json({ message: 'Reason, departure, and return times are required.' });
+        }
+
+        await db.promise().query(
+            'INSERT INTO outpasses (student_id, reason, departure_time, expected_return_time) VALUES (?, ?, ?, ?)',
+            [studentId, reason, departure_time, expected_return_time]
+        );
+
+        res.status(201).json({ message: 'Out pass request submitted successfully.' });
+
+    } catch (err) {
+        console.error('Error submitting out pass request:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// GET: A logged-in student views their own out pass history
+router.get('/outpass', verifyToken, async (req, res) => {
+    try {
+        const studentId = req.user.id;
+        const [outpasses] = await db.promise().query(
+            'SELECT * FROM outpasses WHERE student_id = ? ORDER BY created_at DESC',
+            [studentId]
+        );
+        res.status(200).json(outpasses);
+    } catch (err) {
+        console.error('Error fetching out pass history:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
 module.exports = router;
