@@ -11,6 +11,7 @@ const authRoutes = require('./routes/auth');
 const studentPortalRoutes = require('./routes/studentPortal');
 const complaintRoutes = require('./routes/complaints');
 const announcementRoutes = require('./routes/announcements'); 
+const outpassRoutes = require('./routes/outpasses');
 
 require('dotenv').config();
 
@@ -45,3 +46,4 @@ app.use('/auth', authRoutes);
 app.use('/student', studentPortalRoutes);
 app.use('/complaints', complaintRoutes);
 app.use('/announcements', announcementRoutes);
+app.use('/outpasses', outpassRoutes);
