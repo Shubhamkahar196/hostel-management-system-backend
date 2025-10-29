@@ -76,5 +76,21 @@ router.post('/student/change-password', verifyToken, async (req, res) => {
     }
 });
 
+// student logout 
+
+router.post('/student/logout',(req,res) =>{
+    try{
+        res.cookie("token", ""{
+        httpOnly: true,
+        secure: true,   // Must match login cookie
+        sameSite: "none",  // Must match login cookie
+        expires: new Date(0),  // Be explicit about the path
+        path: '/'
+        }).status(200).json({message: "Logout Successfully" });
+    }catch(err){
+        console.error('Logout Error:', err);
+        res.status(500).json({message: 'Server error});
+    }
+    });
 
 module.exports = router;
